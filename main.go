@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math"
+	rand2 "math/rand"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const (
@@ -163,52 +165,99 @@ func voltageDividerBiasCircuit(vcc float64, r1 float64, r2 float64, rc float64, 
 	println()
 }
 
-func main() {
+func begin(osArgs []string) {
 	args := make([]string, 0, 6)
 
-	for _, arg := range os.Args {
+	for _, arg := range osArgs {
 		args = append(args, strings.ToUpper(arg))
 	}
 
-	if len(args) > 2 {
-		if "SR" == args[1] && len(args[2:]) == 5 {
-			aux := converter(args, 5)
+	if len(args) >= 2 {
+		if "SR" == args[1] || "FR" == args[1] || "VDR" == args[1] {
+			if "SR" == args[1] && len(args[2:]) == 5 {
+				aux := converter(args, 5)
 
-			stableEmitterPolarizationR(aux[0], aux[1], aux[2], aux[3], aux[4])
-		} else if "SR" == args[1] && len(args[2:]) != 5 {
-			fmt.Println("\n- ERRO -\nStable Emitter Polarization (res) has five arguments vcc, rb, rc, re, beta\n ")
+				stableEmitterPolarizationR(aux[0], aux[1], aux[2], aux[3], aux[4])
+			} else if "SR" == args[1] && len(args[2:]) != 5 {
+				fmt.Println("\n- ERRO -\nStable Emitter Polarization (res) has five arguments vcc, rb, rc, re, beta\n ")
+			}
+
+			if "FR" == args[1] && len(args[2:]) == 4 {
+				aux := converter(args, 4)
+
+				fixedPolarizationCircuitR(aux[0], aux[1], aux[2], aux[3])
+			} else if "FR" == args[1] && len(args[2:]) != 4 {
+				fmt.Println("\n- ERRO -\nFixed Polarization Circuit (res) has four arguments vcc, rb, rc, beta\n ")
+			}
+
+			if "VDR" == args[1] && len(args[2:]) == 6 {
+				aux := converter(args, 6)
+
+				voltageDividerBiasCircuit(aux[0], aux[1], aux[2], aux[3], aux[4], aux[5])
+			} else if "VDR" == args[1] && len(args[2:]) != 5 {
+				fmt.Println("\n- ERRO -\nVoltage Divider Bias Circuit (res) has six arguments vcc, r1, r2, rc, re, beta\n ")
+			}
+
+			if "SR" != args[1] && "FR" != args[1] && "VDR" != args[1] {
+				fmt.Printf("The argment \"%s\" does not exist", args[1])
+			}
+		} else if "HELP" == args[1] {
+			help(args)
+		} else {
+			fmt.Println("\n Without valid arguments. HELP form more information\n ")
 		}
-
-		if "FR" == args[1] && len(args[2:]) == 4 {
-			aux := converter(args, 4)
-
-			fixedPolarizationCircuitR(aux[0], aux[1], aux[2], aux[3])
-		} else if "FR" == args[1] && len(args[2:]) != 4 {
-			fmt.Println("\n- ERRO -\nFixed Polarization Circuit (res) has four arguments vcc, rb, rc, beta\n ")
-		}
-
-		if "VDR" == args[1] && len(args[2:]) == 6 {
-			aux := converter(args, 6)
-
-			voltageDividerBiasCircuit(aux[0], aux[1], aux[2], aux[3], aux[4], aux[5])
-		} else if "VDR" == args[1] && len(args[2:]) != 5 {
-			fmt.Println("\n- ERRO -\nVoltage Divider Bias Circuit (res) has six arguments vcc, r1, r2, rc, re, beta\n ")
-		}
-
-		if "SR" != args[1] && "FR" != args[1] && "VDR" != args[1] {
-			fmt.Printf("The argment \"%s\" does not exist", args[1])
-		}
-
-	} else if len(args) == 2 && "HELP" == args[1] {
-		fmt.Printf("\nArguments format => code values...\n"+
-			"EXAMPLE: go run example.go FPCR 10 250000 20000 100\n\n"+
-			"Fixed Polarization Circuit (res) => FR vcc rb rc beta\n%s\n"+
-			"Stable Emitter Polarization (res) => SR vcc rb rc re beta\n%s\n"+
-			"Voltage Divider Bias Circuit (res) => VDR vcc r1 r2 rc re beta\n%s\n\n", schematic[0], schematic[1], schematic[2])
 	} else {
-		println("Without arguments.")
+		println("\n Without arguments. HELP form more information\n ")
 	}
+}
 
-	/*stableEmitterPolR(20, 430000, 2000, 1000, 50)
-	fixedPolCircuitR(16, 470000, 2700, 90)*/
+func help(args []string) {
+	example := []string{" ╔═══════════════════════════════════════════════════╗\n" +
+		" ║ EXAMPLE: go run example.go FR 10 250000 20000 100 ║\n" +
+		" ╚═══════════════════════════════════════════════════╝",
+		" ╔═══════════════════════════════════════════════════════╗\n" +
+			" ║ EXAMPLE: go run example.go SR 15 212000 2000 10000 50 ║\n" +
+			" ╚═══════════════════════════════════════════════════════╝",
+		" ╔═══════════════════════════════════════════════════════╗\n" +
+			" ║ EXAMPLE: go run example.go VDR 1.2 21000 950 12000 80 ║\n" +
+			" ╚═══════════════════════════════════════════════════════╝"}
+
+	top := "\n       ╔════════════════════════════════════╗\n" +
+		"       ║ Arguments format => code values... ║ \n" +
+		"       ╚════════════════════════════════════╝"
+
+	a := "┌──────────────────────────────────┬───────────────────┐\n" +
+		"│ Fixed Polarization Circuit (res) │ FR vcc rb rc beta │\n" +
+		"└──────────────────────────────────┴───────────────────┘"
+
+	b := "┌───────────────────────────────────┬──────────────────────┐\n" +
+		"│ Stable Emitter Polarization (res) │ SR vcc rb rc re beta │\n" +
+		"└───────────────────────────────────┴──────────────────────┘"
+
+	c := "┌────────────────────────────────────┬──────────────────────────┐\n" +
+		"│ Voltage Divider Bias Circuit (res) │ VDR vcc r1 r2 rc re beta │\n" +
+		"└────────────────────────────────────┴──────────────────────────┘"
+
+	rand2.Seed(time.Now().Unix())
+	rand := rand2.Intn(3)
+
+	if len(args) == 2 {
+		fmt.Print("\nS - Simplified help\nF - Full instruction\nSP - Simplified help in portuguese\n ")
+	} else {
+		if args[2] == "S" {
+			fmt.Printf("\n%s\n%s\n\n%s\n%s\n%s\n ", top, example[rand], a, b, c)
+		}
+		if args[2] == "F" {
+			fmt.Print(top)
+			fmt.Printf("%s\n%s\n%s\n%s%s%s%s\n",
+				example[rand], a, schematic[0], b, schematic[1], c, schematic[2])
+		}
+		if args[2] == "SP" {
+			fmt.Println("\nNão implementado\n ")
+		}
+	}
+}
+
+func main() {
+	begin(os.Args)
 }
