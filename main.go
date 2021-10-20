@@ -33,6 +33,26 @@ func init() {
 	schematic = strings.Split(string(dat), "CUT")
 }
 
+func converter(args []string, n int) []float64 {
+	aux := make([]float64, 0, n)
+	ero := make([]string, 0, n)
+
+	for _, arg := range args[2:] {
+		if s, err := strconv.ParseFloat(arg, 64); err == nil {
+			aux = append(aux, s)
+		} else {
+			ero = append(ero, arg)
+		}
+	}
+
+	if len(aux) != n {
+		fmt.Printf("Some value is not a number: %v\n", ero)
+		os.Exit(2)
+	}
+
+	return aux
+}
+
 func multipliers(val map[string]float64, order ...string) {
 	aux := make(map[string]string)
 
@@ -81,13 +101,15 @@ func multipliers(val map[string]float64, order ...string) {
 			fmt.Printf("%5s = %9.4f %sA\n", s, val[s], aux[s])
 		} else if strings.Contains(s, "r") {
 			fmt.Printf("%5s = %9.4f %sΩ\n", s, val[s], aux[s])
-		} else {
+		} else if strings.Contains(s, "v") {
 			fmt.Printf("%5s = %9.4f %sV\n", s, val[s], aux[s])
+		} else {
+			fmt.Printf("%5s = %9.4f %s\n", s, val[s], aux[s])
 		}
 	}
 }
 
-func fixedPolCircuitR(vcc float64, rb float64, rc float64, beta float64) {
+func fixedPolarizationCircuitR(vcc float64, rb float64, rc float64, beta float64) {
 	fmt.Printf("\n- Fixed Polarization Circuit -\n%v", schematic[0])
 
 	val := make(map[string]float64)
@@ -98,14 +120,14 @@ func fixedPolCircuitR(vcc float64, rb float64, rc float64, beta float64) {
 	val["vc"] = val["vce"]
 	val["vbc"] = val["vb"] - val["vc"]
 
-	multipliers(map[string]float64{"vcc": vcc, "rb": rb, "rc": rc}, "vcc", "rb", "rc")
+	multipliers(map[string]float64{"vcc": vcc, "rb": rb, "rc": rc, "β": beta}, "vcc", "rb", "rc", "β")
 	println()
 
 	multipliers(val, "ib", "ic", "vbc", "vce", "vb", "vc")
 	println()
 }
 
-func stableEmitterPolR(vcc float64, rb float64, rc float64, re float64, beta float64) {
+func stableEmitterPolarizationR(vcc float64, rb float64, rc float64, re float64, beta float64) {
 	fmt.Printf("\n- Stable Emitter Polarization -\n%v", schematic[1])
 
 	val := make(map[string]float64)
@@ -117,10 +139,27 @@ func stableEmitterPolR(vcc float64, rb float64, rc float64, re float64, beta flo
 	val["vb"] = 0.7 + val["ve"]
 	val["vbc"] = val["vb"] - val["vc"]
 
-	multipliers(map[string]float64{"vcc": vcc, "rb": rb, "rc": rc, "re": re}, "vcc", "rb", "rc", "re")
+	multipliers(map[string]float64{"vcc": vcc, "rb": rb, "rc": rc, "re": re, "β": beta}, "vcc", "rb", "rc", "re", "β")
 	println()
 
 	multipliers(val, "ib", "ic", "vce", "vc", "ve", "vb", "vbc")
+	println()
+}
+
+func voltageDividerBiasCircuit(vcc float64, r1 float64, r2 float64, rc float64, re float64, beta float64) {
+	fmt.Printf("\n- Stable Emitter Polarization -\n%v", schematic[2])
+
+	val := make(map[string]float64)
+	val["rth"] = (r1 * r2) / (r1 + r2)
+	val["eth"] = (r2 * vcc) / (r1 + r2)
+	val["ib"] = (val["eth"] - 0.7) / (val["rth"] + ((beta + 1) * re))
+	val["ic"] = beta * val["ib"]
+	val["vce"] = vcc - val["ic"]*(rc+re)
+
+	multipliers(map[string]float64{"vcc": vcc, "r1": r1, "r2": r2, "rc": rc, "re": re, "β": beta}, "vcc", "r1", "r2", "rc", "re", "β")
+	println()
+
+	multipliers(val, "rth", "eth", "ib", "ic", "vce")
 	println()
 }
 
@@ -132,38 +171,40 @@ func main() {
 	}
 
 	if len(args) > 2 {
-		if "SEPR" == args[1] && len(args[2:]) == 5 {
-			aux := make([]float64, 0, 5)
+		if "SR" == args[1] && len(args[2:]) == 5 {
+			aux := converter(args, 5)
 
-			for _, arg := range args[2:] {
-				if s, err := strconv.ParseFloat(arg, 64); err == nil {
-					aux = append(aux, s)
-				}
-			}
-
-			stableEmitterPolR(aux[0], aux[1], aux[2], aux[3], aux[4])
-		} else if "SEPR" == args[1] && len(args[2:]) != 5 {
-			fmt.Println("\n- ERRO -\nStable Emitter Polarization (res) has five arguments vcc, rb, rc, re, beta")
+			stableEmitterPolarizationR(aux[0], aux[1], aux[2], aux[3], aux[4])
+		} else if "SR" == args[1] && len(args[2:]) != 5 {
+			fmt.Println("\n- ERRO -\nStable Emitter Polarization (res) has five arguments vcc, rb, rc, re, beta\n ")
 		}
 
-		if "FPCR" == args[1] && len(args[2:]) == 4 {
-			aux := make([]float64, 0, 4)
+		if "FR" == args[1] && len(args[2:]) == 4 {
+			aux := converter(args, 4)
 
-			for _, arg := range args[2:] {
-				if s, err := strconv.ParseFloat(arg, 64); err == nil {
-					aux = append(aux, s)
-				}
-			}
-
-			fixedPolCircuitR(aux[0], aux[1], aux[2], aux[3])
-		} else if "FPCR" == args[1] && len(args[2:]) != 4 {
-			fmt.Println("\n- ERRO -\nFixed Polarization Circuit (res) has four arguments vcc, rb, rc, beta ")
+			fixedPolarizationCircuitR(aux[0], aux[1], aux[2], aux[3])
+		} else if "FR" == args[1] && len(args[2:]) != 4 {
+			fmt.Println("\n- ERRO -\nFixed Polarization Circuit (res) has four arguments vcc, rb, rc, beta\n ")
 		}
-	} else if "HELP" == args[1] {
-		fmt.Println("\nType => code values...\n\n" +
-			"Stable Emitter Polarization (res) => SEPR vcc rb rc re beta\n" +
-			"Fixed Polarization Circuit (res) => FPCR vcc rb rc beta\n\n" +
-			"EXAMPLE: go run example.go FPCR 10 250000 20000 100\n ")
+
+		if "VDR" == args[1] && len(args[2:]) == 6 {
+			aux := converter(args, 6)
+
+			voltageDividerBiasCircuit(aux[0], aux[1], aux[2], aux[3], aux[4], aux[5])
+		} else if "VDR" == args[1] && len(args[2:]) != 5 {
+			fmt.Println("\n- ERRO -\nVoltage Divider Bias Circuit (res) has six arguments vcc, r1, r2, rc, re, beta\n ")
+		}
+
+		if "SR" != args[1] && "FR" != args[1] && "VDR" != args[1] {
+			fmt.Printf("The argment \"%s\" does not exist", args[1])
+		}
+
+	} else if len(args) == 2 && "HELP" == args[1] {
+		fmt.Printf("\nArguments format => code values...\n"+
+			"EXAMPLE: go run example.go FPCR 10 250000 20000 100\n\n"+
+			"Fixed Polarization Circuit (res) => FR vcc rb rc beta\n%s\n"+
+			"Stable Emitter Polarization (res) => SR vcc rb rc re beta\n%s\n"+
+			"Voltage Divider Bias Circuit (res) => VDR vcc r1 r2 rc re beta\n%s\n\n", schematic[0], schematic[1], schematic[2])
 	} else {
 		println("Without arguments.")
 	}
