@@ -24,15 +24,36 @@ const (
 )
 
 var schematic = make([]string, 3)
+var example = make([]string, 4)
+var descriptive = make([]string, 4)
+var title string
 
 func init() {
-	dat, err := ioutil.ReadFile("schematic.txt")
+	list := []string{"schematic.txt", "example.txt", "title.txt", "descriptive.txt"}
 
-	if err != nil {
-		fmt.Print("Schematic error.")
+	for i, txt := range list {
+		dat, err := ioutil.ReadFile(txt)
+
+		if err != nil {
+			fmt.Print("Schematic error.")
+		}
+
+		if i == 0 {
+			schematic = strings.Split(string(dat), "CUT")
+		}
+
+		if i == 1 {
+			example = strings.Split(string(dat), "\nCUT")
+		}
+
+		if i == 2 {
+			title = string(dat)
+		}
+		if i == 3 {
+			descriptive = strings.Split(string(dat), "\nCUT")
+		}
+
 	}
-
-	schematic = strings.Split(string(dat), "CUT")
 }
 
 func begin(osArgs []string) {
@@ -90,36 +111,6 @@ func begin(osArgs []string) {
 }
 
 func help(args []string) {
-	example := []string{" ╔═══════════════════════════════════════════════════╗\n" +
-		" ║ EXAMPLE: go run example.go FR 10 250000 20000 100 ║\n" +
-		" ╚═══════════════════════════════════════════════════╝",
-		" ╔═══════════════════════════════════════════════════════╗\n" +
-			" ║ EXAMPLE: go run example.go SR 15 212000 2000 10000 50 ║\n" +
-			" ╚═══════════════════════════════════════════════════════╝",
-		" ╔═══════════════════════════════════════════════════════╗\n" +
-			" ║ EXAMPLE: go run example.go VDR 1.2 21000 950 12000 80 ║\n" +
-			" ╚═══════════════════════════════════════════════════════╝"}
-
-	top := "\n       ╔════════════════════════════════════╗\n" +
-		"       ║ Arguments format => code values... ║ \n" +
-		"       ╚════════════════════════════════════╝"
-
-	a := "┌──────────────────────────────────┬───────────────────┐\n" +
-		"│ Fixed Polarization Circuit (res) │ FR vcc rb rc beta │\n" +
-		"└──────────────────────────────────┴───────────────────┘"
-
-	b := "┌───────────────────────────────────┬──────────────────────┐\n" +
-		"│ Stable Emitter Polarization (res) │ SR vcc rb rc re beta │\n" +
-		"└───────────────────────────────────┴──────────────────────┘"
-
-	c := "┌────────────────────────────────────┬──────────────────────────┐\n" +
-		"│ Voltage Divider Bias Circuit (res) │ VDR vcc r1 r2 rc re beta │\n" +
-		"└────────────────────────────────────┴──────────────────────────┘"
-
-	d := "┌──────────────────────────────────────┬──────────────────┐\n" +
-		"│ Fixed Polarization Circuit (current) │ FC vcc ib ic vce │\n" +
-		"└──────────────────────────────────────┴──────────────────┘"
-
 	rand2.Seed(time.Now().Unix())
 	rand := rand2.Intn(3)
 
@@ -127,12 +118,14 @@ func help(args []string) {
 		fmt.Print("\nS - Simplified help\nF - Full instruction\nSP - Simplified help in portuguese\n ")
 	} else {
 		if args[2] == "S" {
-			fmt.Printf("\n%s\n%s\n\n%s\n%s\n%s\n%s\n ", top, example[rand], a, b, c, d)
+			fmt.Printf("\n%s%s\n%s%s%s%s\n ",
+				title, example[rand], descriptive[0], descriptive[1], descriptive[2], descriptive[3])
 		}
 		if args[2] == "F" {
-			fmt.Print(top)
-			fmt.Printf("%s\n%s\n%s\n%s%s%s%s%s%s\n",
-				example[rand], a, schematic[0], b, schematic[1], c, schematic[2], d, schematic[0])
+			fmt.Print(title)
+			fmt.Printf("%s%s%s\n%s%s%s%s%s%s\n",
+				example[rand], descriptive[0], schematic[0], descriptive[1], schematic[1], descriptive[2], schematic[2],
+				descriptive[3], schematic[0])
 		}
 		if args[2] == "SP" {
 			fmt.Println("\nNão implementado\n ")
