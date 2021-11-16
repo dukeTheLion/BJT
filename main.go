@@ -23,9 +23,9 @@ const (
 	p = 0.000000000001
 )
 
-var schematic = make([]string, 3)
-var example = make([]string, 4)
-var descriptive = make([]string, 4)
+var schematic = make([]string, 0, 3)
+var example = make([]string, 0, 3)
+var descriptive = make([]string, 0, 7)
 var title string
 
 func init() {
@@ -63,12 +63,21 @@ func begin(osArgs []string) {
 		args = append(args, strings.ToUpper(arg))
 	}
 
+	test := false
+	nameList := []string{"SR", "FR", "VDR", "FC", "ACFR", "ACSR", "ACCSR"}
+
+	for _, s := range nameList {
+		if s == args[1] {
+			test = true
+		}
+	}
+
 	if len(args) >= 2 {
-		if "SR" == args[1] || "FR" == args[1] || "VDR" == args[1] || "FC" == args[1] {
+		if test {
 			if "SR" == args[1] && len(args[2:]) == 5 {
 				aux := converter(args, 5)
 
-				stableEmitterPolarizationR(aux[0], aux[1], aux[2], aux[3], aux[4])
+				stableEmitterPolarizationR(aux[0], aux[1], aux[2], aux[3], aux[4], false)
 			} else if "SR" == args[1] && len(args[2:]) != 5 {
 				fmt.Println("\n- ERRO -\nStable Emitter Polarization (res) has five arguments vcc, rb, rc, re, beta\n ")
 			}
@@ -76,7 +85,7 @@ func begin(osArgs []string) {
 			if "FR" == args[1] && len(args[2:]) == 4 {
 				aux := converter(args, 4)
 
-				fixedPolarizationCircuitR(aux[0], aux[1], aux[2], aux[3])
+				fixedPolarizationCircuitR(aux[0], aux[1], aux[2], aux[3], false)
 			} else if "FR" == args[1] && len(args[2:]) != 4 {
 				fmt.Println("\n- ERRO -\nFixed Polarization Circuit (res) has four arguments vcc, rb, rc, beta\n ")
 			}
@@ -97,8 +106,35 @@ func begin(osArgs []string) {
 				fmt.Println("\n- ERRO -\nVoltage Divider Bias Circuit (res) has six arguments vcc, r1, r2, rc, re, beta\n ")
 			}
 
-			if "SR" != args[1] && "FR" != args[1] && "VDR" != args[1] && "FC" != args[1] {
-				fmt.Printf("The argment \"%s\" does not exist", args[1])
+			if "ACFR" == args[1] && len(args[2:]) == 4 {
+				aux := converter(args, 4)
+
+				rtrn := fixedPolarizationCircuitR(aux[0], aux[1], aux[2], aux[3], true)
+
+				fixedPolarizationCircuitAC(aux[1], aux[2], aux[3], rtrn)
+
+			} else if "ACFR" == args[1] && len(args[2:]) != 4 {
+				fmt.Println("\n- ERRO -\nAC Fixed Polarization Circuit (current) has four arguments vcc, ib, ic, vce\n ")
+			}
+
+			if "ACSR" == args[1] && len(args[2:]) == 5 {
+				aux := converter(args, 5)
+
+				stableEmitterPolarizationAC(aux[1], aux[2], aux[3], aux[4])
+
+			} else if "ACSR" == args[1] && len(args[2:]) != 5 {
+				fmt.Println("\n- ERRO -\nAC Stable Emitter Polarization (res) has five arguments vcc, rb, rc, re, beta\n ")
+			}
+
+			if "ACCSR" == args[1] && len(args[2:]) == 5 {
+				aux := converter(args, 5)
+
+				rtrn := stableEmitterPolarizationR(aux[0], aux[1], aux[2], aux[3], aux[4], true)
+
+				stableEmitterPolarizationACC(aux[1], aux[2], aux[3], aux[4], rtrn)
+
+			} else if "ACCSR" == args[1] && len(args[2:]) != 5 {
+				fmt.Println("\n- ERRO -\nAC C Stable Emitter Polarization (res) has five arguments vcc, rb, rc, re, beta\n ")
 			}
 		} else if "HELP" == args[1] {
 			help(args)
@@ -118,8 +154,12 @@ func help(args []string) {
 		fmt.Print("\nS - Simplified help\nF - Full instruction\nSP - Simplified help in portuguese\n ")
 	} else {
 		if args[2] == "S" {
-			fmt.Printf("\n%s%s\n%s%s%s%s\n ",
-				title, example[rand], descriptive[0], descriptive[1], descriptive[2], descriptive[3])
+			fmt.Printf("\n%s%s\n",
+				title, example[rand])
+			for _, s := range descriptive {
+				fmt.Print(s)
+			}
+			println()
 		}
 		if args[2] == "F" {
 			fmt.Print(title)
@@ -197,21 +237,26 @@ func multipliers(val map[string]float64, order ...string) {
 	}
 
 	for _, s := range order {
-		if strings.Contains(s, "i") {
+		switch s[0] {
+		case 'i':
 			fmt.Printf("%5s = %9.4f %sA\n", s, val[s], aux[s])
-		} else if strings.Contains(s, "r") {
+		case 'r':
 			fmt.Printf("%5s = %9.4f %sΩ\n", s, val[s], aux[s])
-		} else if strings.Contains(s, "v") {
+		case 'h':
+			fmt.Printf("%5s = %9.4f %sΩ\n", s, val[s], aux[s])
+		case 'z':
+			fmt.Printf("%5s = %9.4f %sΩ\n", s, val[s], aux[s])
+		case 'v':
 			fmt.Printf("%5s = %9.4f %sV\n", s, val[s], aux[s])
-		} else {
+		default:
 			fmt.Printf("%5s = %9.4f %s\n", s, val[s], aux[s])
 		}
 	}
 }
 
-func fixedPolarizationCircuitR(vcc float64, rb float64, rc float64, beta float64) {
-	fmt.Printf("\n- Fixed Polarization Circuit -\n%v", schematic[0])
+// Resistor
 
+func fixedPolarizationCircuitR(vcc float64, rb float64, rc float64, beta float64, bl bool) map[string]float64 {
 	val := make(map[string]float64)
 	val["ib"] = (vcc - 0.7) / rb
 	val["ic"] = beta * val["ib"]
@@ -220,16 +265,20 @@ func fixedPolarizationCircuitR(vcc float64, rb float64, rc float64, beta float64
 	val["vc"] = val["vce"]
 	val["vbc"] = val["vb"] - val["vc"]
 
-	multipliers(map[string]float64{"vcc": vcc, "rb": rb, "rc": rc, "β": beta}, "vcc", "rb", "rc", "β")
-	println()
+	if !bl {
+		fmt.Printf("\n- Fixed Polarization Circuit -\n%v", schematic[0])
 
-	multipliers(val, "ib", "ic", "vbc", "vce", "vb", "vc")
-	println()
+		multipliers(map[string]float64{"vcc": vcc, "rb": rb, "rc": rc, "β": beta}, "vcc", "rb", "rc", "β")
+		println()
+
+		multipliers(val, "ib", "ic", "vbc", "vce", "vb", "vc")
+		println()
+	}
+
+	return val
 }
 
-func stableEmitterPolarizationR(vcc float64, rb float64, rc float64, re float64, beta float64) {
-	fmt.Printf("\n- Stable Emitter Polarization -\n%v", schematic[1])
-
+func stableEmitterPolarizationR(vcc float64, rb float64, rc float64, re float64, beta float64, bl bool) map[string]float64 {
 	val := make(map[string]float64)
 	val["ib"] = (vcc - 0.7) / (rb + (beta+1)*re)
 	val["ic"] = beta * val["ib"]
@@ -239,11 +288,17 @@ func stableEmitterPolarizationR(vcc float64, rb float64, rc float64, re float64,
 	val["vb"] = 0.7 + val["ve"]
 	val["vbc"] = val["vb"] - val["vc"]
 
-	multipliers(map[string]float64{"vcc": vcc, "rb": rb, "rc": rc, "re": re, "β": beta}, "vcc", "rb", "rc", "re", "β")
-	println()
+	if !bl {
+		fmt.Printf("\n- Stable Emitter Polarization -\n%v", schematic[1])
 
-	multipliers(val, "ib", "ic", "vce", "vc", "ve", "vb", "vbc")
-	println()
+		multipliers(map[string]float64{"vcc": vcc, "rb": rb, "rc": rc, "re": re, "β": beta}, "vcc", "rb", "rc", "re", "β")
+		println()
+
+		multipliers(val, "ib", "ic", "vce", "vc", "ve", "vb", "vbc")
+		println()
+	}
+
+	return val
 }
 
 func voltageDividerBiasCircuit(vcc float64, r1 float64, r2 float64, rc float64, re float64, beta float64) {
@@ -263,6 +318,8 @@ func voltageDividerBiasCircuit(vcc float64, r1 float64, r2 float64, rc float64, 
 	println()
 }
 
+// Current
+
 func fixedPolarizationCircuitC(vcc float64, ib float64, ic float64, vce float64) {
 	fmt.Printf("\n- Fixed Polarization Circuit -\n%v", schematic[0])
 
@@ -275,6 +332,53 @@ func fixedPolarizationCircuitC(vcc float64, ib float64, ic float64, vce float64)
 	println()
 
 	multipliers(val, "rb", "rc", "β")
+	println()
+}
+
+// Alternate Current
+
+func fixedPolarizationCircuitAC(rb float64, rc float64, beta float64, ac map[string]float64) {
+	val := make(map[string]float64)
+	val["ie"] = (beta + 1) * ac["ib"]
+	val["re"] = 0.026 / val["ie"]
+	val["hie"] = beta * val["re"]
+	val["zi"] = 1 / ((1 / rb) + (1 / val["hie"]))
+	val["zo"] = rc
+	val["av"] = -rc / val["re"]
+	val["ai"] = -val["av"] * (val["zi"] / rc)
+
+	fmt.Printf("\n- CA Fixed Polarization Circuit -\n%v", schematic[0])
+
+	multipliers(val, "ie", "re", "hie", "zi", "zo", "av", "ai")
+	println()
+}
+
+func stableEmitterPolarizationAC(rb float64, rc float64, re float64, beta float64) {
+	val := make(map[string]float64)
+	val["zb"] = beta * re
+	val["zi"] = 1 / ((1 / rb) + (1 / val["zb"]))
+	val["av"] = -(beta * rc) / val["zb"]
+	val["ai"] = -val["av"] * (val["zi"] / rc)
+
+	fmt.Printf("\n- CA Fixed Polarization Circuit -\n%v", schematic[0])
+
+	multipliers(val, "zb", "zi", "av", "ai")
+	println()
+}
+
+func stableEmitterPolarizationACC(rb float64, rc float64, re float64, beta float64, ac map[string]float64) {
+	val := make(map[string]float64)
+	val["ie"] = (beta + 1) * ac["ib"]
+	val["re"] = 0.026 / val["ie"]
+	val["hie"] = beta * val["re"]
+	val["zi"] = 1 / ((1 / rb) + (1 / val["hie"]))
+	val["zo"] = rc
+	val["av"] = -rc / val["re"]
+	val["ai"] = -val["av"] * (val["zi"] / rc)
+
+	fmt.Printf("\n- CA Fixed Polarization Circuit -\n%v", schematic[0])
+
+	multipliers(val, "ie", "re", "hie", "zi", "zo", "av", "ai")
 	println()
 }
 
